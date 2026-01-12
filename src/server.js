@@ -1,11 +1,16 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { takeAllScreenshots, SCREENSHOTS_DIR } = require('./screenshot');
 const { loadSchedule, saveSchedule, startScheduler } = require('./scheduler');
 
 const WEBSITES_FILE = path.join(__dirname, '..', 'data', 'websites.json');
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+// Simple password protection
+const APP_PASSWORD = process.env.APP_PASSWORD || 'changeme';
+const activeSessions = new Set();
 
 function loadWebsites() {
   try {
@@ -24,6 +29,15 @@ function saveWebsites(websites) {
   fs.writeFileSync(WEBSITES_FILE, JSON.stringify(websites, null, 2));
 }
 
+// Authentication middleware
+function requireAuth(req, res, next) {
+  const token = req.headers['x-auth-token'];
+  if (token && activeSessions.has(token)) {
+    return next();
+  }
+  res.status(401).json({ error: 'Unauthorized' });
+}
+
 function createServer() {
   const app = express();
 
@@ -34,6 +48,39 @@ function createServer() {
   });
 
   app.use(express.json());
+
+  // Login endpoint (unprotected)
+  app.post('/api/login', (req, res) => {
+    const { password } = req.body;
+    if (password === APP_PASSWORD) {
+      const token = crypto.randomBytes(32).toString('hex');
+      activeSessions.add(token);
+      res.json({ success: true, token });
+    } else {
+      res.status(401).json({ error: 'Invalid password' });
+    }
+  });
+
+  // Check auth status
+  app.get('/api/auth', (req, res) => {
+    const token = req.headers['x-auth-token'];
+    if (token && activeSessions.has(token)) {
+      res.json({ authenticated: true });
+    } else {
+      res.json({ authenticated: false });
+    }
+  });
+
+  // Logout endpoint
+  app.post('/api/logout', (req, res) => {
+    const token = req.headers['x-auth-token'];
+    if (token) {
+      activeSessions.delete(token);
+    }
+    res.json({ success: true });
+  });
+
+  // Static files
   app.use(express.static(PUBLIC_DIR));
   app.use('/screenshots', express.static(SCREENSHOTS_DIR));
 
@@ -43,13 +90,13 @@ function createServer() {
   });
 
   // Get all websites
-  app.get('/api/websites', (req, res) => {
+  app.get('/api/websites', requireAuth, (req, res) => {
     const websites = loadWebsites();
     res.json(websites);
   });
 
   // Add a website
-  app.post('/api/websites', (req, res) => {
+  app.post('/api/websites', requireAuth, (req, res) => {
     try {
       const { url } = req.body;
 
@@ -79,7 +126,7 @@ function createServer() {
   });
 
   // Delete a website
-  app.delete('/api/websites', (req, res) => {
+  app.delete('/api/websites', requireAuth, (req, res) => {
     const { url } = req.body;
 
     if (!url) {
@@ -99,7 +146,7 @@ function createServer() {
   });
 
   // Get screenshots for a website
-  app.get('/api/screenshots/:folder', (req, res) => {
+  app.get('/api/screenshots/:folder', requireAuth, (req, res) => {
     const folderName = req.params.folder;
     const folderPath = path.join(SCREENSHOTS_DIR, folderName);
 
@@ -125,7 +172,7 @@ function createServer() {
   });
 
   // Trigger manual screenshot run
-  app.post('/api/screenshots/run', async (req, res) => {
+  app.post('/api/screenshots/run', requireAuth, async (req, res) => {
     const websites = loadWebsites();
 
     if (websites.length === 0) {
@@ -139,13 +186,13 @@ function createServer() {
   });
 
   // Get schedule
-  app.get('/api/schedule', (req, res) => {
+  app.get('/api/schedule', requireAuth, (req, res) => {
     const schedule = loadSchedule();
     res.json(schedule);
   });
 
   // Update schedule
-  app.post('/api/schedule', (req, res) => {
+  app.post('/api/schedule', requireAuth, (req, res) => {
     try {
       const schedule = req.body;
 

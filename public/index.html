@@ -318,9 +318,108 @@
       background: #f5f5f5;
       color: #999;
     }
+
+    /* Login overlay styles */
+    .login-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #f5f5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .login-overlay.hidden {
+      display: none;
+    }
+
+    .login-box {
+      background: white;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .login-box h1 {
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    .login-box .subtitle {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .login-box input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+      margin-bottom: 16px;
+    }
+
+    .login-box input[type="password"]:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+
+    .login-box button {
+      width: 100%;
+    }
+
+    .login-error {
+      color: #e74c3c;
+      font-size: 14px;
+      margin-bottom: 16px;
+      text-align: center;
+      display: none;
+    }
+
+    .login-error.visible {
+      display: block;
+    }
+
+    .logout-btn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #95a5a6;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .logout-btn:hover {
+      background: #7f8c8d;
+    }
   </style>
 </head>
 <body>
+  <!-- Login overlay -->
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+      <h1>Web Monitor</h1>
+      <p class="subtitle">Enter password to continue</p>
+      <div id="loginError" class="login-error">Invalid password</div>
+      <form id="loginForm">
+        <input type="password" id="passwordInput" placeholder="Password" required autofocus>
+        <button type="submit" class="btn-primary">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <button id="logoutBtn" class="logout-btn" style="display: none;">Logout</button>
+
   <div class="container">
     <h1>Web Monitor</h1>
     <p class="subtitle" id="scheduleSubtitle">Loading schedule...</p>
@@ -416,18 +515,130 @@
     const bulkStatus = document.getElementById('bulkStatus');
     const saveScheduleBtn = document.getElementById('saveScheduleBtn');
     const scheduleStatus = document.getElementById('scheduleStatus');
+    const loginOverlay = document.getElementById('loginOverlay');
+    const loginForm = document.getElementById('loginForm');
+    const passwordInput = document.getElementById('passwordInput');
+    const loginError = document.getElementById('loginError');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    // Auth helper - get token from localStorage
+    function getAuthToken() {
+      return localStorage.getItem('authToken');
+    }
+
+    // Auth helper - make authenticated fetch requests
+    async function authFetch(url, options = {}) {
+      const token = getAuthToken();
+      const headers = { ...options.headers };
+      if (token) {
+        headers['X-Auth-Token'] = token;
+      }
+      const response = await fetch(url, { ...options, headers });
+      if (response.status === 401) {
+        // Session expired or invalid
+        localStorage.removeItem('authToken');
+        showLogin();
+        throw new Error('Session expired');
+      }
+      return response;
+    }
+
+    // Show login overlay
+    function showLogin() {
+      loginOverlay.classList.remove('hidden');
+      logoutBtn.style.display = 'none';
+      passwordInput.value = '';
+      loginError.classList.remove('visible');
+    }
+
+    // Hide login overlay and show app
+    function showApp() {
+      loginOverlay.classList.add('hidden');
+      logoutBtn.style.display = 'block';
+      loadWebsites();
+      loadSchedule();
+    }
+
+    // Check if already logged in
+    async function checkAuth() {
+      const token = getAuthToken();
+      if (!token) {
+        showLogin();
+        return;
+      }
+      try {
+        const response = await fetch('/api/auth', {
+          headers: { 'X-Auth-Token': token }
+        });
+        const data = await response.json();
+        if (data.authenticated) {
+          showApp();
+        } else {
+          localStorage.removeItem('authToken');
+          showLogin();
+        }
+      } catch (error) {
+        showLogin();
+      }
+    }
+
+    // Handle login form submission
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const password = passwordInput.value;
+
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.token) {
+          localStorage.setItem('authToken', data.token);
+          loginError.classList.remove('visible');
+          showApp();
+        } else {
+          loginError.classList.add('visible');
+          passwordInput.value = '';
+          passwordInput.focus();
+        }
+      } catch (error) {
+        loginError.textContent = 'Connection error';
+        loginError.classList.add('visible');
+      }
+    });
+
+    // Handle logout
+    logoutBtn.addEventListener('click', async () => {
+      const token = getAuthToken();
+      try {
+        await fetch('/api/logout', {
+          method: 'POST',
+          headers: { 'X-Auth-Token': token }
+        });
+      } catch (error) {
+        // Ignore errors
+      }
+      localStorage.removeItem('authToken');
+      showLogin();
+    });
 
     async function loadWebsites() {
       try {
         console.log('Fetching websites...');
-        const response = await fetch('/api/websites');
+        const response = await authFetch('/api/websites');
         console.log('Response status:', response.status);
         const websites = await response.json();
         console.log('Websites:', websites);
         renderWebsites(websites);
       } catch (error) {
         console.error('Load error:', error);
-        websiteList.innerHTML = '<li class="empty-state">Failed to load websites: ' + error.message + '</li>';
+        if (error.message !== 'Session expired') {
+          websiteList.innerHTML = '<li class="empty-state">Failed to load websites: ' + error.message + '</li>';
+        }
       }
     }
 
@@ -470,7 +681,7 @@
       screenshotModal.classList.add('active');
 
       try {
-        const response = await fetch('/api/screenshots/' + encodeURIComponent(folderName));
+        const response = await authFetch('/api/screenshots/' + encodeURIComponent(folderName));
         const screenshots = await response.json();
 
         if (screenshots.length === 0) {
@@ -513,7 +724,7 @@
       const url = urlInput.value.trim();
 
       try {
-        const response = await fetch('/api/websites', {
+        const response = await authFetch('/api/websites', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url })
@@ -565,7 +776,7 @@
         }
 
         try {
-          const response = await fetch('/api/websites', {
+          const response = await authFetch('/api/websites', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url })
@@ -582,6 +793,7 @@
             }
           }
         } catch (error) {
+          if (error.message === 'Session expired') return;
           failed++;
         }
       }
@@ -599,7 +811,7 @@
       if (!confirm('Remove this website?')) return;
 
       try {
-        const response = await fetch('/api/websites', {
+        const response = await authFetch('/api/websites', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url })
@@ -623,7 +835,7 @@
       runNowBtn.textContent = 'Running...';
 
       try {
-        const response = await fetch('/api/screenshots/run', { method: 'POST' });
+        const response = await authFetch('/api/screenshots/run', { method: 'POST' });
         const data = await response.json();
 
         if (!response.ok) {
@@ -654,7 +866,7 @@
 
     async function loadSchedule() {
       try {
-        const response = await fetch('/api/schedule');
+        const response = await authFetch('/api/schedule');
         const schedule = await response.json();
 
         // Reset all checkboxes and disable time inputs
@@ -706,7 +918,7 @@
       saveScheduleBtn.textContent = 'Saving...';
 
       try {
-        const response = await fetch('/api/schedule', {
+        const response = await authFetch('/api/schedule', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(schedule)
@@ -722,15 +934,17 @@
         showStatus(scheduleStatus, 'Schedule saved successfully');
         updateSubtitle(schedule);
       } catch (error) {
-        showStatus(scheduleStatus, 'Failed to save schedule', true);
+        if (error.message !== 'Session expired') {
+          showStatus(scheduleStatus, 'Failed to save schedule', true);
+        }
       } finally {
         saveScheduleBtn.disabled = false;
         saveScheduleBtn.textContent = 'Save Schedule';
       }
     });
 
-    loadWebsites();
-    loadSchedule();
+    // Initialize - check authentication
+    checkAuth();
   </script>
 </body>
 </html>
