@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Monitor - Screenshot Manager</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      line-height: 1.6;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      color: #2c3e50;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .card h2 {
+      font-size: 1.2em;
+      margin-bottom: 15px;
+      color: #34495e;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="url"] {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+
+    input[type="url"]:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary {
+      background: #3498db;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #2980b9;
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+      color: white;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+
+    .btn-danger:hover {
+      background: #c0392b;
+    }
+
+    .btn-secondary {
+      background: #95a5a6;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #7f8c8d;
+    }
+
+    .website-list {
+      list-style: none;
+    }
+
+    .website-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .website-item:last-child {
+      border-bottom: none;
+    }
+
+    .website-url {
+      color: #3498db;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    .website-url:hover {
+      text-decoration: underline;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #999;
+      padding: 30px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 15px;
+      display: none;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      display: block;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      display: block;
+    }
+
+    .btn-view {
+      background: #27ae60;
+      color: white;
+      padding: 8px 16px;
+      font-size: 14px;
+      margin-right: 8px;
+    }
+
+    .btn-view:hover {
+      background: #219a52;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.8);
+      z-index: 1000;
+      overflow-y: auto;
+    }
+
+    .modal.active {
+      display: block;
+    }
+
+    .modal-content {
+      background: white;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+      border-radius: 8px;
+      position: relative;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      word-break: break-all;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0;
+      color: #666;
+    }
+
+    .screenshot-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+    }
+
+    .screenshot-item {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .screenshot-item img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      cursor: pointer;
+    }
+
+    .screenshot-item img:hover {
+      opacity: 0.9;
+    }
+
+    .screenshot-info {
+      padding: 8px;
+      font-size: 12px;
+      color: #666;
+      background: #f9f9f9;
+    }
+
+    .no-screenshots {
+      text-align: center;
+      color: #999;
+      padding: 40px;
+    }
+
+    .website-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .bulk-textarea {
+      width: 100%;
+      height: 120px;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: monospace;
+      resize: vertical;
+      margin-bottom: 10px;
+    }
+
+    .bulk-textarea:focus {
+      outline: none;
+      border-color: #3498db;
+    }
+
+    .bulk-hint {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .schedule-list {
+      margin-bottom: 15px;
+    }
+
+    .schedule-row {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 8px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .schedule-row:last-child {
+      border-bottom: none;
+    }
+
+    .schedule-row label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      width: 120px;
+    }
+
+    .schedule-row input[type="time"] {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .schedule-row input[type="time"]:disabled {
+      background: #f5f5f5;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Web Monitor</h1>
+    <p class="subtitle" id="scheduleSubtitle">Loading schedule...</p>
+
+    <div class="card">
+      <h2>Add Website</h2>
+      <form id="addForm" class="form-row">
+        <input type="url" id="urlInput" placeholder="https://example.com" required>
+        <button type="submit" class="btn-primary">Add</button>
+      </form>
+      <div id="addStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>Bulk Import</h2>
+      <p class="bulk-hint">Paste multiple URLs (one per line)</p>
+      <textarea id="bulkInput" class="bulk-textarea" placeholder="https://example.com&#10;https://google.com&#10;https://github.com"></textarea>
+      <button id="bulkImportBtn" class="btn-primary">Import All</button>
+      <div id="bulkStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>Schedule</h2>
+      <p class="bulk-hint">Enable days and set time for each</p>
+      <div class="schedule-list">
+        <div class="schedule-row">
+          <label><input type="checkbox" data-day="0"> Sunday</label>
+          <input type="time" data-day-time="0" value="15:00">
+        </div>
+        <div class="schedule-row">
+          <label><input type="checkbox" data-day="1"> Monday</label>
+          <input type="time" data-day-time="1" value="15:00">
+        </div>
+        <div class="schedule-row">
+          <label><input type="checkbox" data-day="2"> Tuesday</label>
+          <input type="time" data-day-time="2" value="15:00">
+        </div>
+        <div class="schedule-row">
+          <label><input type="checkbox" data-day="3"> Wednesday</label>
+          <input type="time" data-day-time="3" value="15:00">
+        </div>
+        <div class="schedule-row">
+          <label><input type="checkbox" data-day="4"> Thursday</label>
+          <input type="time" data-day-time="4" value="15:00">
+        </div>
+        <div class="schedule-row">
+          <label><input type="checkbox" data-day="5"> Friday</label>
+          <input type="time" data-day-time="5" value="15:00">
+        </div>
+        <div class="schedule-row">
+          <label><input type="checkbox" data-day="6"> Saturday</label>
+          <input type="time" data-day-time="6" value="15:00">
+        </div>
+      </div>
+      <button id="saveScheduleBtn" class="btn-primary">Save Schedule</button>
+      <div id="scheduleStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>Monitored Websites</h2>
+      <ul id="websiteList" class="website-list">
+        <li class="empty-state">Loading...</li>
+      </ul>
+      <div class="actions">
+        <button id="runNowBtn" class="btn-secondary">Take Screenshots Now</button>
+      </div>
+      <div id="runStatus" class="status"></div>
+    </div>
+  </div>
+
+  <div id="screenshotModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">Screenshots</h2>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div id="screenshotGrid" class="screenshot-grid"></div>
+    </div>
+  </div>
+
+  <script>
+    const websiteList = document.getElementById('websiteList');
+    const addForm = document.getElementById('addForm');
+    const urlInput = document.getElementById('urlInput');
+    const addStatus = document.getElementById('addStatus');
+    const runNowBtn = document.getElementById('runNowBtn');
+    const runStatus = document.getElementById('runStatus');
+    const screenshotModal = document.getElementById('screenshotModal');
+    const screenshotGrid = document.getElementById('screenshotGrid');
+    const modalTitle = document.getElementById('modalTitle');
+    const bulkInput = document.getElementById('bulkInput');
+    const bulkImportBtn = document.getElementById('bulkImportBtn');
+    const bulkStatus = document.getElementById('bulkStatus');
+    const saveScheduleBtn = document.getElementById('saveScheduleBtn');
+    const scheduleStatus = document.getElementById('scheduleStatus');
+
+    async function loadWebsites() {
+      try {
+        console.log('Fetching websites...');
+        const response = await fetch('/api/websites');
+        console.log('Response status:', response.status);
+        const websites = await response.json();
+        console.log('Websites:', websites);
+        renderWebsites(websites);
+      } catch (error) {
+        console.error('Load error:', error);
+        websiteList.innerHTML = '<li class="empty-state">Failed to load websites: ' + error.message + '</li>';
+      }
+    }
+
+    function renderWebsites(websites) {
+      if (websites.length === 0) {
+        websiteList.innerHTML = '<li class="empty-state">No websites added yet</li>';
+        return;
+      }
+
+      websiteList.innerHTML = websites.map(url => {
+        const folderName = urlToFolderName(url);
+        return `
+        <li class="website-item">
+          <a href="${escapeHtml(url)}" target="_blank" class="website-url">${escapeHtml(url)}</a>
+          <div class="website-buttons">
+            <button class="btn-view" onclick="viewScreenshots('${escapeHtml(folderName)}', '${escapeHtml(url)}')">View Screenshots</button>
+            <button class="btn-danger" onclick="deleteWebsite('${escapeHtml(url)}')">Remove</button>
+          </div>
+        </li>
+      `}).join('');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function urlToFolderName(url) {
+      return url
+        .replace(/^https?:\/\//, '')
+        .replace(/[^a-zA-Z0-9.-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    }
+
+    async function viewScreenshots(folderName, url) {
+      modalTitle.textContent = url;
+      screenshotGrid.innerHTML = '<p class="no-screenshots">Loading...</p>';
+      screenshotModal.classList.add('active');
+
+      try {
+        const response = await fetch('/api/screenshots/' + encodeURIComponent(folderName));
+        const screenshots = await response.json();
+
+        if (screenshots.length === 0) {
+          screenshotGrid.innerHTML = '<p class="no-screenshots">No screenshots taken yet</p>';
+          return;
+        }
+
+        screenshotGrid.innerHTML = screenshots.map(s => {
+          const timestamp = s.filename.replace('screenshot_', '').replace('.png', '').replace(/-/g, ' ').slice(0, 16);
+          return `
+            <div class="screenshot-item">
+              <img src="${s.url}" alt="Screenshot" onclick="window.open('${s.url}', '_blank')">
+              <div class="screenshot-info">${timestamp}</div>
+            </div>
+          `;
+        }).join('');
+      } catch (error) {
+        screenshotGrid.innerHTML = '<p class="no-screenshots">Failed to load screenshots</p>';
+      }
+    }
+
+    function closeModal() {
+      screenshotModal.classList.remove('active');
+    }
+
+    screenshotModal.addEventListener('click', (e) => {
+      if (e.target === screenshotModal) closeModal();
+    });
+
+    function showStatus(element, message, isError = false) {
+      element.textContent = message;
+      element.className = 'status ' + (isError ? 'error' : 'success');
+      setTimeout(() => {
+        element.className = 'status';
+      }, 3000);
+    }
+
+    addForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = urlInput.value.trim();
+
+      try {
+        const response = await fetch('/api/websites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showStatus(addStatus, data.error, true);
+          return;
+        }
+
+        showStatus(addStatus, 'Website added successfully');
+        urlInput.value = '';
+        renderWebsites(data.websites);
+      } catch (error) {
+        console.error('Add website error:', error);
+        showStatus(addStatus, 'Failed to add website: ' + error.message, true);
+      }
+    });
+
+    bulkImportBtn.addEventListener('click', async () => {
+      const text = bulkInput.value.trim();
+      if (!text) {
+        showStatus(bulkStatus, 'Please paste some URLs first', true);
+        return;
+      }
+
+      const urls = text.split(/[\n,]+/)
+        .map(u => u.trim())
+        .filter(u => u.length > 0);
+
+      if (urls.length === 0) {
+        showStatus(bulkStatus, 'No valid URLs found', true);
+        return;
+      }
+
+      bulkImportBtn.disabled = true;
+      bulkImportBtn.textContent = 'Importing...';
+
+      let added = 0;
+      let skipped = 0;
+      let failed = 0;
+
+      for (const url of urls) {
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          const response = await fetch('/api/websites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+          });
+
+          if (response.ok) {
+            added++;
+          } else {
+            const data = await response.json();
+            if (data.error === 'Website already exists') {
+              skipped++;
+            } else {
+              failed++;
+            }
+          }
+        } catch (error) {
+          failed++;
+        }
+      }
+
+      bulkImportBtn.disabled = false;
+      bulkImportBtn.textContent = 'Import All';
+      bulkInput.value = '';
+
+      const message = `Added: ${added}, Skipped: ${skipped}, Failed: ${failed}`;
+      showStatus(bulkStatus, message, failed > 0 && added === 0);
+      loadWebsites();
+    });
+
+    async function deleteWebsite(url) {
+      if (!confirm('Remove this website?')) return;
+
+      try {
+        const response = await fetch('/api/websites', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data.error);
+          return;
+        }
+
+        renderWebsites(data.websites);
+      } catch (error) {
+        alert('Failed to remove website');
+      }
+    }
+
+    runNowBtn.addEventListener('click', async () => {
+      runNowBtn.disabled = true;
+      runNowBtn.textContent = 'Running...';
+
+      try {
+        const response = await fetch('/api/screenshots/run', { method: 'POST' });
+        const data = await response.json();
+
+        if (!response.ok) {
+          showStatus(runStatus, data.error, true);
+          return;
+        }
+
+        showStatus(runStatus, `Screenshot job started for ${data.count} website(s)`);
+      } catch (error) {
+        showStatus(runStatus, 'Failed to start screenshot job', true);
+      } finally {
+        runNowBtn.disabled = false;
+        runNowBtn.textContent = 'Take Screenshots Now';
+      }
+    });
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const scheduleSubtitle = document.getElementById('scheduleSubtitle');
+
+    // Toggle time input enabled state based on checkbox
+    document.querySelectorAll('input[data-day]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const day = cb.dataset.day;
+        const timeInput = document.querySelector(`input[data-day-time="${day}"]`);
+        timeInput.disabled = !cb.checked;
+      });
+    });
+
+    async function loadSchedule() {
+      try {
+        const response = await fetch('/api/schedule');
+        const schedule = await response.json();
+
+        // Reset all checkboxes and disable time inputs
+        document.querySelectorAll('input[data-day]').forEach(cb => {
+          cb.checked = false;
+          const day = cb.dataset.day;
+          const timeInput = document.querySelector(`input[data-day-time="${day}"]`);
+          timeInput.disabled = true;
+          timeInput.value = '15:00';
+        });
+
+        // Set enabled days and times from schedule
+        for (const [day, time] of Object.entries(schedule)) {
+          const cb = document.querySelector(`input[data-day="${day}"]`);
+          const timeInput = document.querySelector(`input[data-day-time="${day}"]`);
+          if (cb && timeInput) {
+            cb.checked = true;
+            timeInput.disabled = false;
+            timeInput.value = time;
+          }
+        }
+
+        updateSubtitle(schedule);
+      } catch (error) {
+        console.error('Failed to load schedule:', error);
+        scheduleSubtitle.textContent = 'Schedule not configured';
+      }
+    }
+
+    function updateSubtitle(schedule) {
+      const entries = Object.entries(schedule);
+      if (entries.length === 0) {
+        scheduleSubtitle.textContent = 'No schedule configured';
+        return;
+      }
+      const parts = entries.map(([day, time]) => `${dayNames[day]} ${time}`);
+      scheduleSubtitle.textContent = `Screenshots: ${parts.join(', ')}`;
+    }
+
+    saveScheduleBtn.addEventListener('click', async () => {
+      const schedule = {};
+      document.querySelectorAll('input[data-day]:checked').forEach(cb => {
+        const day = cb.dataset.day;
+        const timeInput = document.querySelector(`input[data-day-time="${day}"]`);
+        schedule[day] = timeInput.value;
+      });
+
+      saveScheduleBtn.disabled = true;
+      saveScheduleBtn.textContent = 'Saving...';
+
+      try {
+        const response = await fetch('/api/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(schedule)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          showStatus(scheduleStatus, data.error, true);
+          return;
+        }
+
+        showStatus(scheduleStatus, 'Schedule saved successfully');
+        updateSubtitle(schedule);
+      } catch (error) {
+        showStatus(scheduleStatus, 'Failed to save schedule', true);
+      } finally {
+        saveScheduleBtn.disabled = false;
+        saveScheduleBtn.textContent = 'Save Schedule';
+      }
+    });
+
+    loadWebsites();
+    loadSchedule();
+  </script>
+</body>
+</html>
